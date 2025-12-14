@@ -91,13 +91,13 @@ echo ""
 tui_title "System Detection"
 echo ""
 
-tui_table_header "Property" "Value" 12
-tui_table_row "Distro" "$DETECTED_DISTRO" 12
-tui_table_row "Shell" "$DETECTED_SHELL" 12
-tui_table_row "Session" "$DETECTED_SESSION" 12
-tui_table_row "Compositor" "$DETECTED_DE" 12
-tui_table_row "AUR Helper" "$DETECTED_AUR" 12
-tui_table_footer 12
+tui_table_header "Property" "Value" 12 35
+tui_table_row "Distro" "$DETECTED_DISTRO" 12 35
+tui_table_row "Shell" "$DETECTED_SHELL" 12 35
+tui_table_row "Session" "$DETECTED_SESSION" 12 35
+tui_table_row "Compositor" "$DETECTED_DE" 12 35
+tui_table_row "AUR Helper" "$DETECTED_AUR" 12 35
+tui_table_footer 12 35
 
 echo ""
 

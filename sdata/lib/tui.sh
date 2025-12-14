@@ -32,7 +32,7 @@ tui_spin() {
 tui_title() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 212 --bold "$text"
+        echo "$text" | gum style --foreground 212 --bold
     else
         echo -e "${STY_CYAN}${STY_BOLD}$text${STY_RST}"
     fi
@@ -41,7 +41,7 @@ tui_title() {
 tui_subtitle() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 245 --italic "$text"
+        echo "$text" | gum style --foreground 245 --italic
     else
         echo -e "${STY_FAINT}$text${STY_RST}"
     fi
@@ -50,7 +50,7 @@ tui_subtitle() {
 tui_success() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 82 "✓ $text"
+        echo "✓ $text" | gum style --foreground 82
     else
         echo -e "${STY_GREEN}✓${STY_RST} $text"
     fi
@@ -59,7 +59,7 @@ tui_success() {
 tui_error() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 196 "✗ $text"
+        echo "✗ $text" | gum style --foreground 196
     else
         echo -e "${STY_RED}✗${STY_RST} $text"
     fi
@@ -68,7 +68,7 @@ tui_error() {
 tui_warn() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 214 "⚠ $text"
+        echo "⚠ $text" | gum style --foreground 214
     else
         echo -e "${STY_YELLOW}⚠${STY_RST} $text"
     fi
@@ -77,7 +77,7 @@ tui_warn() {
 tui_info() {
     local text="$1"
     if $HAS_GUM; then
-        gum style --foreground 39 "→ $text"
+        echo "→ $text" | gum style --foreground 39
     else
         echo -e "${STY_BLUE}→${STY_RST} $text"
     fi
@@ -235,12 +235,13 @@ tui_status_line() {
 }
 
 tui_divider() {
-    local char="${1:─}"
+    local char="${1:--}"
     local width="${2:-50}"
+    local line=$(printf '%*s' "$width" | tr ' ' "$char")
     if $HAS_GUM; then
-        gum style --foreground 240 "$(printf '%*s' "$width" | tr ' ' "$char")"
+        echo "$line" | gum style --foreground 240
     else
-        echo -e "${STY_FAINT}$(printf '%*s' "$width" | tr ' ' "$char")${STY_RST}"
+        echo -e "${STY_FAINT}${line}${STY_RST}"
     fi
 }
 
@@ -253,7 +254,7 @@ tui_step() {
     local description="$3"
     
     if $HAS_GUM; then
-        gum style --foreground 212 --bold "[$current/$total]" --foreground 255 " $description"
+        echo "[$current/$total] $description" | gum style --foreground 212 --bold
     else
         echo -e "${STY_CYAN}${STY_BOLD}[$current/$total]${STY_RST} $description"
     fi
@@ -290,13 +291,31 @@ tui_table_header() {
     local col1="$1"
     local col2="$2"
     local col1_width="${3:-20}"
+    local col2_width="${4:-30}"
     
-    printf "  ${STY_FAINT}┌$(printf '%*s' $((col1_width+2)) | tr ' ' '─')┬$(printf '%*s' 30 | tr ' ' '─')┐${STY_RST}\n"
-    printf "  ${STY_FAINT}│${STY_RST} ${STY_BOLD}%-${col1_width}s${STY_RST} ${STY_FAINT}│${STY_RST} ${STY_BOLD}%s${STY_RST}\n" "$col1" "$col2"
-    printf "  ${STY_FAINT}├$(printf '%*s' $((col1_width+2)) | tr ' ' '─')┼$(printf '%*s' 30 | tr ' ' '─')┤${STY_RST}\n"
+    local h_line1=$(printf '%*s' $((col1_width+2)) | tr ' ' '-')
+    local h_line2=$(printf '%*s' $((col2_width)) | tr ' ' '-')
+    
+    echo -e "  ${STY_FAINT}+${h_line1}+${h_line2}+${STY_RST}"
+    printf "  ${STY_FAINT}|${STY_RST} ${STY_BOLD}%-${col1_width}s${STY_RST} ${STY_FAINT}|${STY_RST} ${STY_BOLD}%-$((col2_width-2))s${STY_RST} ${STY_FAINT}|${STY_RST}\n" "$col1" "$col2"
+    echo -e "  ${STY_FAINT}+${h_line1}+${h_line2}+${STY_RST}"
+}
+
+tui_table_row() {
+    local col1="$1"
+    local col2="$2"
+    local col1_width="${3:-20}"
+    local col2_width="${4:-30}"
+    
+    printf "  ${STY_FAINT}|${STY_RST} %-${col1_width}s ${STY_FAINT}|${STY_RST} %-$((col2_width-2))s ${STY_FAINT}|${STY_RST}\n" "$col1" "$col2"
 }
 
 tui_table_footer() {
     local col1_width="${1:-20}"
-    printf "  ${STY_FAINT}└$(printf '%*s' $((col1_width+2)) | tr ' ' '─')┴$(printf '%*s' 30 | tr ' ' '─')┘${STY_RST}\n"
+    local col2_width="${2:-30}"
+    
+    local h_line1=$(printf '%*s' $((col1_width+2)) | tr ' ' '-')
+    local h_line2=$(printf '%*s' $((col2_width)) | tr ' ' '-')
+    
+    echo -e "  ${STY_FAINT}+${h_line1}+${h_line2}+${STY_RST}"
 }
