@@ -13,11 +13,10 @@ Add `-y` for non-interactive mode.
 ## Update
 
 ```bash
-git pull
 ./setup update
 ```
 
-Updates QML code, restarts the shell, and offers pending migrations.
+Checks remote for updates, pulls changes, syncs QML code, restarts shell, and offers pending migrations. Creates a snapshot before updating for easy rollback.
 
 ## Doctor
 
@@ -31,6 +30,15 @@ Diagnoses and **automatically fixes** common issues:
 - Python packages (via uv)
 - Version tracking
 - File manifest
+- Starts shell if not running
+
+## Rollback
+
+```bash
+./setup rollback
+```
+
+Restore a previous snapshot if something breaks after an update. Shows available snapshots with dates and lets you choose which one to restore.
 
 ## Commands
 
@@ -38,8 +46,9 @@ Diagnoses and **automatically fixes** common issues:
 |---------|-------------|
 | `./setup` | Interactive menu |
 | `./setup install` | Full installation |
-| `./setup update` | Update + restart shell |
-| `./setup doctor` | Diagnose and fix |
+| `./setup update` | Check remote, pull, sync, restart |
+| `./setup doctor` | Diagnose and auto-fix |
+| `./setup rollback` | Restore previous snapshot |
 
 Options: `-y` (skip prompts), `-q` (quiet), `-h` (help)
 

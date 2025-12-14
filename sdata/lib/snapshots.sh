@@ -156,10 +156,17 @@ restore_snapshot() {
         cp "${snapshot_dir}/migrations.json" "${XDG_CONFIG_HOME}/illogical-impulse/"
     fi
     
-    # Checkout git to that commit
+    # Checkout git to that commit (stay on branch if possible)
     if [[ -n "$commit_before" && "$commit_before" != "unknown" ]]; then
         log_info "Checking out commit ${commit_before}..."
-        git -C "$REPO_ROOT" checkout "$commit_before" 2>/dev/null || true
+        # Try to find a branch containing this commit to avoid detached HEAD
+        local branch=$(git -C "$REPO_ROOT" branch --contains "$commit_before" 2>/dev/null | grep -v "HEAD detached" | head -1 | sed 's/^[* ]*//')
+        if [[ -n "$branch" ]]; then
+            git -C "$REPO_ROOT" checkout "$branch" 2>/dev/null || true
+            git -C "$REPO_ROOT" reset --hard "$commit_before" 2>/dev/null || true
+        else
+            git -C "$REPO_ROOT" checkout "$commit_before" 2>/dev/null || true
+        fi
     fi
     
     # Update version tracking
