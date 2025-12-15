@@ -35,6 +35,16 @@ Singleton {
     onUseUSCSChanged: root.getData()
     onCityChanged: root._geocodeCity()
 
+    Component.onCompleted: {
+        if (root.enabled && (Config.ready ?? false)) {
+            if (root.gpsActive && !positionSource.active) {
+                console.info("[WeatherService] Starting GPS service.")
+                positionSource.start()
+            }
+            Qt.callLater(() => root.getData())
+        }
+    }
+
     property var location: ({ valid: false, lat: 0, lon: 0, name: "" })
 
     property var data: ({
@@ -151,7 +161,7 @@ Singleton {
         }
         const cleanCity = root.city.replace(/[\r\n]+/g, '').trim();
         const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanCity)}&count=1&language=en&format=json`;
-        geocoder.command = ["curl", "-s", "--max-time", "10", url];
+        geocoder.command = ["/usr/bin/curl", "-s", "--max-time", "10", url];
         geocoder.running = true;
     }
 
@@ -174,14 +184,14 @@ Singleton {
         const lon = root.location.lon;
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure&daily=sunrise,sunset,uv_index_max&timezone=auto`;
 
-        fetcher.command = ["curl", "-s", "--max-time", "10", url];
+        fetcher.command = ["/usr/bin/curl", "-s", "--max-time", "10", url];
         fetcher.running = true;
     }
 
     // Geocoding process
     Process {
         id: geocoder
-        command: ["curl", "-s", "--max-time", "10", ""]
+        command: ["/usr/bin/curl", "-s", "--max-time", "10", ""]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0) return;
@@ -211,7 +221,7 @@ Singleton {
     // IP-based location fallback
     Process {
         id: ipLocator
-        command: ["curl", "-s", "--max-time", "10", "http://ip-api.com/json/?fields=lat,lon,city,regionName"]
+        command: ["/usr/bin/curl", "-s", "--max-time", "10", "http://ip-api.com/json/?fields=lat,lon,city,regionName"]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0) return;
@@ -237,7 +247,7 @@ Singleton {
     // Weather data fetcher
     Process {
         id: fetcher
-        command: ["curl", "-s", "--max-time", "10", ""]
+        command: ["/usr/bin/curl", "-s", "--max-time", "10", ""]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0) return;
@@ -276,7 +286,7 @@ Singleton {
                 positionSource.stop();
                 root.location.valid = false;
                 root.gpsActive = false;
-                Quickshell.execDetached(["notify-send", Translation.tr("Weather Service"),
+                Quickshell.execDetached(["/usr/bin/notify-send", Translation.tr("Weather Service"),
                     Translation.tr("Cannot find a GPS service. Using the fallback method instead."), "-a", "Shell"]);
                 console.error("[WeatherService] Could not acquire a valid backend plugin.");
                 root._geocodeCity();
