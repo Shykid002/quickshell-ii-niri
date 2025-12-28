@@ -522,7 +522,9 @@ Singleton {
                 return
             }
             root.currentModelId = modelId;
-            if (setPersistentState) Config.setNestedValue(["ai", "model"], modelId);
+            if (setPersistentState && Persistent.states?.ai) {
+                Persistent.states.ai.model = modelId;
+            }
             if (feedback) root.addMessage(Translation.tr("Model set to %1").arg(model.name), root.interfaceRole);
             if (model.requires_key) {
                 // If key not there show advice
