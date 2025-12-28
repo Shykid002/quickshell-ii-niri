@@ -42,6 +42,7 @@ Singleton {
     // property var messages: []
     property var messageIDs: []
     property var messageByID: ({})
+    property bool _pendingRequest: false
     readonly property var apiKeys: KeyringStorage.keyringData?.apiKeys ?? {}
     readonly property var apiKeysLoaded: KeyringStorage.loaded
     readonly property bool currentModelHasApiKey: {
@@ -351,6 +352,17 @@ Singleton {
         setModel(currentModelId, false, false);
     }
 
+    // Retry pending request when API keys finish loading
+    Connections {
+        target: KeyringStorage
+        function onLoadedChanged() {
+            if (KeyringStorage.loaded && root._pendingRequest) {
+                root._pendingRequest = false;
+                requester.makeRequest();
+            }
+        }
+    }
+
     Component.onCompleted: {
         // Lazy: initialize only when UI actually uses the AI service.
     }
@@ -624,8 +636,13 @@ Singleton {
         function makeRequest() {
             const model = models[currentModelId];
 
-            // Fetch API keys if needed
-            if (model?.requires_key && !KeyringStorage.loaded) KeyringStorage.fetchKeyringData();
+            // Ensure API keys are loaded before making request
+            if (model?.requires_key && !KeyringStorage.loaded) {
+                KeyringStorage.fetchKeyringData();
+                // Wait for keys to load, then retry
+                _pendingRequest = true;
+                return;
+            }
             
             requester.currentStrategy = root.currentApiStrategy;
             requester.currentStrategy.reset(); // Reset strategy state
