@@ -131,15 +131,23 @@ Rectangle {
                         : Translation.tr("Interface")
             }
 
-            // Not visible indicator
+            // Not visible indicator (icon only, tooltip on hover)
             MaterialSymbol {
+                id: notVisibleIcon
                 visible: messageData?.role == 'interface'
                 Layout.alignment: Qt.AlignVCenter
                 iconSize: 12
                 color: Appearance.colors.colSubtext
                 text: "visibility_off"
                 
+                MouseArea {
+                    id: notVisibleMouseArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                }
+                
                 StyledToolTip {
+                    visible: notVisibleMouseArea.containsMouse
                     text: Translation.tr("Not visible to model")
                 }
             }
