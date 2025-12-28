@@ -28,7 +28,11 @@ Scope {
     ]
 
     property bool cheatsheetOpen: false
-    property int currentPage: 0
+    property int currentPage: Persistent.states?.cheatsheet?.tabIndex ?? 0
+    onCurrentPageChanged: {
+        if (Persistent.states?.cheatsheet)
+            Persistent.states.cheatsheet.tabIndex = currentPage
+    }
 
     function open() { cheatsheetOpen = true; }
     function close() { cheatsheetOpen = false; }
