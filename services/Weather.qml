@@ -26,9 +26,18 @@ Singleton {
     }
 
     onEnabledChanged: {
-        if (root.enabled && root.gpsActive && !positionSource.active) {
-            console.info("[WeatherService] Weather enabled, starting GPS.")
-            positionSource.start()
+        if (root.enabled) {
+            console.info("[WeatherService] Weather enabled")
+            if (root.gpsActive && !positionSource.active) {
+                console.info("[WeatherService] Starting GPS.")
+                positionSource.start()
+            }
+            // Trigger initial fetch if Config is already ready
+            // This handles the race condition where Config.ready fires before enabled propagates
+            if (Config.ready && !root.location.valid) {
+                console.info("[WeatherService] Config already ready, triggering initial fetch")
+                Qt.callLater(() => root.getData())
+            }
         }
     }
 
@@ -67,6 +76,9 @@ Singleton {
         temp: "--°C",
         tempFeelsLike: "--°C"
     })
+    
+    // Forecast for next days: [{date, tempMax, tempMin, wCode, chanceOfRain, description}]
+    property var forecast: []
 
     function isNightNow(): bool {
         const now = new Date();
@@ -181,14 +193,75 @@ Singleton {
         }
 
         // Avoid duplicate requests
-        if (fetcher.running) return;
+        if (fetcher.running || fallbackFetcher.running) return;
 
         const lat = root.location.lat;
         const lon = root.location.lon;
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure&daily=sunrise,sunset,uv_index_max&timezone=auto`;
 
-        fetcher.command = ["/usr/bin/curl", "-s", "--max-time", "10", url];
+        fetcher.command = ["/usr/bin/curl", "-s", "--max-time", "8", url];
         fetcher.running = true;
+    }
+    
+    function _fetchFallback(): void {
+        if (fallbackFetcher.running) return;
+        const city = encodeURIComponent(root.location.name || root.city || "auto");
+        fallbackFetcher.command = ["/usr/bin/curl", "-s", "--max-time", "10", `https://wttr.in/${city}?format=j1`];
+        fallbackFetcher.running = true;
+    }
+    
+    function _refineWttrData(apiData: var): void {
+        const current = apiData?.current_condition?.[0];
+        const astro = apiData?.weather?.[0]?.astronomy?.[0];
+        const weatherDays = apiData?.weather ?? [];
+        if (!current) return;
+
+        let result = {};
+        result.wCode = current.weatherCode ?? "113";
+        result.city = root.location.name || root.city || "Unknown";
+        result.humidity = (current.humidity ?? 0) + "%";
+        result.windDir = current.winddir16Point ?? "N";
+        result.uv = current.uvIndex ?? "0";
+        result.visib = (current.visibility ?? 10) + " km";
+        result.precip = (current.precipMM ?? 0) + " mm";
+        
+        // Parse sunrise/sunset times
+        result.sunrise = astro?.sunrise?.replace(/\s*(AM|PM)/i, (m, p) => ' ' + p.toUpperCase()) ?? "--:--";
+        result.sunset = astro?.sunset?.replace(/\s*(AM|PM)/i, (m, p) => ' ' + p.toUpperCase()) ?? "--:--";
+        result.sunriseIso = "";
+        result.sunsetIso = "";
+
+        if (root.useUSCS) {
+            result.temp = (current.temp_F ?? 0) + "°F";
+            result.tempFeelsLike = (current.FeelsLikeF ?? 0) + "°F";
+            result.wind = (current.windspeedMiles ?? 0) + " mph";
+            result.press = (current.pressureInches ?? 30) + " inHg";
+        } else {
+            result.temp = (current.temp_C ?? 0) + "°C";
+            result.tempFeelsLike = (current.FeelsLikeC ?? 0) + "°C";
+            result.wind = (current.windspeedKmph ?? 0) + " km/h";
+            result.press = (current.pressure ?? 1013) + " hPa";
+        }
+
+        root.data = result;
+        
+        // Parse forecast (skip today, get next 2 days)
+        let forecastList = [];
+        for (let i = 1; i < Math.min(weatherDays.length, 4); i++) {
+            const day = weatherDays[i];
+            const midday = day.hourly?.[4] ?? {}; // 12:00
+            const maxRain = Math.max(...(day.hourly?.map(h => parseInt(h.chanceofrain) || 0) ?? [0]));
+            
+            forecastList.push({
+                date: day.date,
+                tempMax: root.useUSCS ? day.maxtempF + "°F" : day.maxtempC + "°C",
+                tempMin: root.useUSCS ? day.mintempF + "°F" : day.mintempC + "°C",
+                wCode: midday.weatherCode ?? "113",
+                chanceOfRain: maxRain,
+                description: midday.weatherDesc?.[0]?.value ?? ""
+            });
+        }
+        root.forecast = forecastList;
     }
 
     // Geocoding process
@@ -247,19 +320,65 @@ Singleton {
         }
     }
 
-    // Weather data fetcher
+    // Weather data fetcher (primary: open-meteo)
     Process {
         id: fetcher
+        property bool _fallbackCalled: false
+        command: ["/usr/bin/curl", "-s", "--max-time", "8", ""]
+        onRunningChanged: if (running) _fallbackCalled = false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.length === 0) {
+                    if (!fetcher._fallbackCalled) {
+                        fetcher._fallbackCalled = true;
+                        console.warn("[WeatherService] Open-meteo returned empty, trying fallback");
+                        root._fetchFallback();
+                    }
+                    return;
+                }
+                try {
+                    const data = JSON.parse(text);
+                    if (data.error || !data.current) {
+                        if (!fetcher._fallbackCalled) {
+                            fetcher._fallbackCalled = true;
+                            console.warn("[WeatherService] Open-meteo error, trying fallback");
+                            root._fetchFallback();
+                        }
+                        return;
+                    }
+                    root._refineData(data);
+                    console.info("[WeatherService] Updated:", root.data.temp, root.data.city)
+                } catch (e) {
+                    if (!fetcher._fallbackCalled) {
+                        fetcher._fallbackCalled = true;
+                        console.warn("[WeatherService] Open-meteo parse error, trying fallback");
+                        root._fetchFallback();
+                    }
+                }
+            }
+        }
+        onExited: (code, status) => {
+            if (code !== 0 && !fetcher._fallbackCalled) {
+                fetcher._fallbackCalled = true;
+                console.warn("[WeatherService] Open-meteo fetch failed (code", code + "), trying fallback");
+                root._fetchFallback();
+            }
+        }
+    }
+    
+    // Weather data fetcher (fallback: wttr.in)
+    Process {
+        id: fallbackFetcher
         command: ["/usr/bin/curl", "-s", "--max-time", "10", ""]
         stdout: StdioCollector {
             onStreamFinished: {
                 if (text.length === 0) return;
                 try {
                     const data = JSON.parse(text);
-                    root._refineData(data);
-                    console.info("[WeatherService] Updated:", root.data.temp, root.data.city)
+                    root._refineWttrData(data);
+                    console.info("[WeatherService] Updated (wttr.in):", root.data.temp, root.data.city)
                 } catch (e) {
-                    console.error(`[WeatherService] Fetch error: ${e.message}`);
+                    console.error("[WeatherService] Fallback fetch error:", e.message);
                 }
             }
         }
