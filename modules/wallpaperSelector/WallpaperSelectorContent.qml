@@ -391,6 +391,16 @@ MouseArea {
                             horizontalCenter: parent.horizontalCenter
                             bottomMargin: 8
                         }
+                        
+                        // Calculate screen position for aurora blur
+                        screenX: {
+                            const mapped = extraOptions.mapToGlobal(0, 0)
+                            return mapped.x
+                        }
+                        screenY: {
+                            const mapped = extraOptions.mapToGlobal(0, 0)
+                            return mapped.y
+                        }
 
                         IconToolbarButton {
                             implicitWidth: height

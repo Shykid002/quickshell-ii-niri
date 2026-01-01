@@ -23,10 +23,12 @@ Item {
             horizontalCenter: root.horizontalCenter
         }
         color: Appearance.inirEverywhere ? Appearance.inir.colLayer2
+             : Appearance.auroraEverywhere ? Appearance.aurora.colTooltipSurface
              : Appearance.colors.colLayer3
         radius: Appearance.inirEverywhere ? Appearance.inir.roundingNormal : Appearance.rounding.verysmall
         border.width: 1
         border.color: Appearance.inirEverywhere ? Appearance.inir.colBorder
+                    : Appearance.auroraEverywhere ? Appearance.aurora.colTooltipBorder
                     : Appearance.colors.colLayer3Hover
         opacity: shown ? 1 : 0
         implicitWidth: shown ? (tooltipTextObject.implicitWidth + 2 * root.horizontalPadding) : 0
