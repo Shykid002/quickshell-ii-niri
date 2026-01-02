@@ -51,6 +51,7 @@ Item {
 
     MouseArea {
         anchors.fill: parent
+        acceptedButtons: Qt.NoButton
         onWheel: (e) => { root.weekOffset += e.angleDelta.y > 0 ? -1 : 1 }
     }
 
