@@ -325,7 +325,7 @@ run_update() {
         
         # Sync directories
         for dir in modules services scripts assets translations sdata/uv; do
-            [[ -d "${II_SOURCE}/${dir}" ]] && rsync -a --delete "${II_SOURCE}/${dir}/" "${II_TARGET}/${dir}/"
+            [[ -d "${II_SOURCE}/${dir}" ]] && mkdir -p "${II_TARGET}/${dir}" && rsync -a --delete "${II_SOURCE}/${dir}/" "${II_TARGET}/${dir}/"
         done
         
         # Cleanup deprecated files
