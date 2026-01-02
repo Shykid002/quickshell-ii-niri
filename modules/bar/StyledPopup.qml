@@ -18,7 +18,7 @@ LazyLoader {
 
     signal requestClose()
 
-    active: root.hoverActivates && hoverTarget && hoverTarget.containsMouse
+    active: root.hoverActivates && hoverTarget && (hoverTarget.containsMouse ?? hoverTarget.buttonHovered ?? false)
     onActiveChanged: {
         if (!root.active)
             root.popupHovered = false;
