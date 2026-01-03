@@ -61,6 +61,7 @@ Variants {
         readonly property string wallpaperPathRaw: bgRoot.backgroundOptions.wallpaperPath ?? ""
         readonly property string wallpaperThumbnailPath: bgRoot.backgroundOptions.thumbnailPath ?? bgRoot.wallpaperPathRaw
         property bool wallpaperIsVideo: wallpaperPathRaw.endsWith(".mp4") || wallpaperPathRaw.endsWith(".webm") || wallpaperPathRaw.endsWith(".mkv") || wallpaperPathRaw.endsWith(".avi") || wallpaperPathRaw.endsWith(".mov")
+        property bool wallpaperIsGif: wallpaperPathRaw.toLowerCase().endsWith(".gif")
         property string wallpaperPath: wallpaperIsVideo ? bgRoot.wallpaperThumbnailPath : bgRoot.wallpaperPathRaw
         property bool wallpaperSafetyTriggered: {
             const enabled = bgRoot.workSafetyEnableOptions.wallpaper ?? false;
@@ -187,13 +188,9 @@ Variants {
             anchors.fill: parent
             clip: true
 
-            StyledImage {
-                id: wallpaper
-                visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive
-                opacity: (status === Image.Ready && !bgRoot.wallpaperIsVideo) ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
-                cache: false
-                smooth: false
+            // Wallpaper container - used as reference for blur and widgets
+            Item {
+                id: wallpaperContainer
                 property int chunkSize: Config?.options.bar.workspaces.shown ?? 10
                 property int lower: Math.floor(bgRoot.firstWorkspaceId / chunkSize) * chunkSize
                 property int upper: Math.ceil(bgRoot.lastWorkspaceId / chunkSize) * chunkSize
@@ -219,24 +216,52 @@ Variants {
                 }
                 property real effectiveValueX: Math.max(0, Math.min(1, valueX))
                 property real effectiveValueY: Math.max(0, Math.min(1, valueY))
-                x: bgRoot.fillMode === "fill" ? (-(bgRoot.movableXSpace) - (effectiveValueX - 0.5) * 2 * bgRoot.movableXSpace) : ((bgRoot.screen.width - width) / 2)
-                y: bgRoot.fillMode === "fill" ? (-(bgRoot.movableYSpace) - (effectiveValueY - 0.5) * 2 * bgRoot.movableYSpace) : ((bgRoot.screen.height - height) / 2)
-                source: bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
-                fillMode: bgRoot.fillMode === "fit" ? Image.PreserveAspectFit
-                        : bgRoot.fillMode === "tile" ? Image.Tile
-                        : bgRoot.fillMode === "center" ? Image.Pad
-                        : Image.PreserveAspectCrop
-                Behavior on x { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-                Behavior on y { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
-                sourceSize {
-                    width: bgRoot.screen.width * bgRoot.effectiveWallpaperScale * (bgRoot.monitor?.scale ?? 1)
-                    height: bgRoot.screen.height * bgRoot.effectiveWallpaperScale * (bgRoot.monitor?.scale ?? 1)
+                
+                readonly property bool useParallax: bgRoot.fillMode === "fill" && !bgRoot.wallpaperIsGif
+                x: useParallax ? (-(bgRoot.movableXSpace) - (effectiveValueX - 0.5) * 2 * bgRoot.movableXSpace) : 0
+                y: useParallax ? (-(bgRoot.movableYSpace) - (effectiveValueY - 0.5) * 2 * bgRoot.movableYSpace) : 0
+                Behavior on x { NumberAnimation { duration: useParallax ? 600 : 0; easing.type: Easing.OutCubic } }
+                Behavior on y { NumberAnimation { duration: useParallax ? 600 : 0; easing.type: Easing.OutCubic } }
+                width: useParallax ? (bgRoot.wallpaperWidth / bgRoot.wallpaperToScreenRatio * bgRoot.effectiveWallpaperScale) : bgRoot.screen.width
+                height: useParallax ? (bgRoot.wallpaperHeight / bgRoot.wallpaperToScreenRatio * bgRoot.effectiveWallpaperScale) : bgRoot.screen.height
+
+                // Static wallpaper (non-GIF images)
+                StyledImage {
+                    id: wallpaper
+                    anchors.fill: parent
+                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive && !bgRoot.wallpaperIsGif
+                    opacity: (status === Image.Ready && !bgRoot.wallpaperIsVideo && !bgRoot.wallpaperIsGif) ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
+                    cache: false
+                    smooth: false
+                    source: bgRoot.wallpaperSafetyTriggered ? "" : bgRoot.wallpaperPath
+                    fillMode: bgRoot.fillMode === "fit" ? Image.PreserveAspectFit
+                            : bgRoot.fillMode === "tile" ? Image.Tile
+                            : bgRoot.fillMode === "center" ? Image.Pad
+                            : Image.PreserveAspectCrop
+                    sourceSize {
+                        width: bgRoot.screen.width * bgRoot.effectiveWallpaperScale * (bgRoot.monitor?.scale ?? 1)
+                        height: bgRoot.screen.height * bgRoot.effectiveWallpaperScale * (bgRoot.monitor?.scale ?? 1)
+                    }
                 }
-                width: bgRoot.wallpaperWidth / bgRoot.wallpaperToScreenRatio * bgRoot.effectiveWallpaperScale
-                height: bgRoot.wallpaperHeight / bgRoot.wallpaperToScreenRatio * bgRoot.effectiveWallpaperScale
+
+                // Animated GIF wallpaper
+                AnimatedImage {
+                    id: gifWallpaper
+                    anchors.fill: parent
+                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive && bgRoot.wallpaperIsGif
+                    opacity: (status === AnimatedImage.Ready && bgRoot.wallpaperIsGif) ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.InOutQuad } }
+                    cache: true
+                    playing: visible && !GlobalStates.screenLocked
+                    asynchronous: true
+                    source: (bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif) ? "" : bgRoot.wallpaperPath
+                    fillMode: Image.PreserveAspectCrop
+                    // No sourceSize for GIFs - let Qt handle native size for performance
+                }
             }
 
-            // Always-on wallpaper blur
+            // Always-on wallpaper blur (disabled for GIFs - too expensive)
             Loader {
                 id: blurAlwaysLoader
                 z: 1
@@ -247,7 +272,8 @@ Variants {
                         && (bgRoot.effectsOptions.blurRadius ?? 0) > 0
                         && !blurLoader.active
                         && !bgRoot.backdropActive
-                anchors.fill: wallpaper
+                        && !bgRoot.wallpaperIsGif
+                anchors.fill: wallpaperContainer
                 sourceComponent: Item {
                     anchors.fill: parent
                     opacity: bgRoot.wallpaperIsVideo
@@ -256,7 +282,7 @@ Variants {
 
                     GaussianBlur {
                         anchors.fill: parent
-                        source: wallpaper
+                        source: wallpaperContainer
                         radius: bgRoot.effectsOptions.blurRadius ?? 32
                         samples: radius * 2 + 1
                     }
@@ -267,7 +293,7 @@ Variants {
                 id: blurLoader
                 z: 2
                 active: (bgRoot.lockBlurOptions.enable ?? false) && (GlobalStates.screenLocked || scaleAnim.running)
-                anchors.fill: wallpaper
+                anchors.fill: wallpaperContainer
                 scale: GlobalStates.screenLocked ? (bgRoot.lockBlurOptions.extraZoom ?? 1) : 1
                 Behavior on scale {
                     NumberAnimation {
@@ -278,7 +304,7 @@ Variants {
                     }
                 }
                 sourceComponent: GaussianBlur {
-                    source: wallpaper
+                    source: wallpaperContainer
                     radius: GlobalStates.screenLocked ? (bgRoot.lockBlurOptions.radius ?? 0) : 0
                     samples: radius * 2 + 1
                     Rectangle {
@@ -309,19 +335,20 @@ Variants {
             WidgetCanvas {
                 id: widgetCanvas
                 z: 20
+                readonly property bool useParallax: wallpaperContainer.useParallax && !bgRoot.backdropActive
                 anchors {
-                    left: bgRoot.backdropActive ? parent.left : wallpaper.left
-                    right: bgRoot.backdropActive ? parent.right : wallpaper.right
-                    top: bgRoot.backdropActive ? parent.top : wallpaper.top
-                    bottom: bgRoot.backdropActive ? parent.bottom : wallpaper.bottom
+                    left: useParallax ? wallpaperContainer.left : parent.left
+                    right: useParallax ? wallpaperContainer.right : parent.right
+                    top: useParallax ? wallpaperContainer.top : parent.top
+                    bottom: useParallax ? wallpaperContainer.bottom : parent.bottom
                     readonly property real parallaxFactor: bgRoot.parallaxOptions.widgetsFactor ?? 1
-                    leftMargin: bgRoot.backdropActive ? 0 : bgRoot.movableXSpace - (wallpaper.effectiveValueX * 2 * bgRoot.movableXSpace) * (parallaxFactor - 1)
-                    topMargin: bgRoot.backdropActive ? 0 : bgRoot.movableYSpace - (wallpaper.effectiveValueY * 2 * bgRoot.movableYSpace) * (parallaxFactor - 1)
+                    leftMargin: useParallax ? (bgRoot.movableXSpace - (wallpaperContainer.effectiveValueX * 2 * bgRoot.movableXSpace) * (parallaxFactor - 1)) : 0
+                    topMargin: useParallax ? (bgRoot.movableYSpace - (wallpaperContainer.effectiveValueY * 2 * bgRoot.movableYSpace) * (parallaxFactor - 1)) : 0
                     Behavior on leftMargin { animation: Appearance.animation.elementMove.numberAnimation.createObject(this) }
                     Behavior on topMargin { animation: Appearance.animation.elementMove.numberAnimation.createObject(this) }
                 }
-                width: bgRoot.backdropActive ? parent.width : wallpaper.width
-                height: bgRoot.backdropActive ? parent.height : wallpaper.height
+                width: useParallax ? wallpaperContainer.width : parent.width
+                height: useParallax ? wallpaperContainer.height : parent.height
                 states: State {
                     name: "centered"
                     when: GlobalStates.screenLocked || bgRoot.wallpaperSafetyTriggered || bgRoot.backdropActive
