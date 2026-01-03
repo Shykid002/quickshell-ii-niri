@@ -398,7 +398,7 @@ Item {
                         buttonText: modelData.label
                         colBackground: Appearance.auroraEverywhere ? "transparent" : Appearance.colors.colLayer2
 
-                        downAction: () => {
+                        onClicked: {
                             Wallhaven.sortingMode = modelData.sorting
                             if (modelData.topRange !== undefined) {
                                 Wallhaven.topRange = modelData.topRange

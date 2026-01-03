@@ -1013,6 +1013,170 @@ ContentPage {
                         text: Translation.tr("Browse and download wallpapers from Wallhaven")
                     }
                 }
+
+                SettingsSwitch {
+                    buttonIcon: "calendar_month"
+                    text: Translation.tr("Anime Schedule")
+                    checked: Config.options.sidebar?.animeSchedule?.enable ?? false
+                    onCheckedChanged: Config.setNestedValue("sidebar.animeSchedule.enable", checked)
+                    StyledToolTip {
+                        text: Translation.tr("View anime airing schedule, seasonal and top anime")
+                    }
+                }
+
+                SettingsSwitch {
+                    buttonIcon: "forum"
+                    text: Translation.tr("Reddit")
+                    checked: Config.options.sidebar?.reddit?.enable ?? false
+                    onCheckedChanged: Config.setNestedValue("sidebar.reddit.enable", checked)
+                    StyledToolTip {
+                        text: Translation.tr("Browse posts from your favorite subreddits")
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Reddit")
+                visible: Config.options.sidebar?.reddit?.enable ?? false
+
+                ConfigSpinBox {
+                    icon: "format_list_numbered"
+                    text: Translation.tr("Posts per page")
+                    value: Config.options.sidebar?.reddit?.limit ?? 25
+                    from: 10
+                    to: 50
+                    stepSize: 5
+                    onValueChanged: Config.setNestedValue("sidebar.reddit.limit", value)
+                    StyledToolTip {
+                        text: Translation.tr("Number of posts to fetch per request")
+                    }
+                }
+
+                // Subreddits editor
+                ColumnLayout {
+                    id: subredditEditor
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    property var subreddits: []
+                    
+                    Component.onCompleted: {
+                        subreddits = Config.options?.sidebar?.reddit?.subreddits ?? ["unixporn", "linux", "archlinux", "kde", "gnome"]
+                    }
+                    
+                    Connections {
+                        target: Config
+                        function onConfigChanged() {
+                            subredditEditor.subreddits = Config.options?.sidebar?.reddit?.subreddits ?? ["unixporn", "linux", "archlinux", "kde", "gnome"]
+                        }
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Repeater {
+                            model: subredditEditor.subreddits
+
+                            Rectangle {
+                                id: subChip
+                                required property string modelData
+                                required property int index
+                                width: chipRow.implicitWidth + 8
+                                height: 26
+                                radius: 13
+                                color: chipMouse.containsMouse ? Appearance.colors.colSecondaryContainerHover : Appearance.colors.colSecondaryContainer
+
+                                RowLayout {
+                                    id: chipRow
+                                    anchors.centerIn: parent
+                                    spacing: 2
+
+                                    StyledText {
+                                        text: "r/" + subChip.modelData
+                                        font.pixelSize: Appearance.font.pixelSize.smallest
+                                        color: Appearance.colors.colOnSecondaryContainer
+                                    }
+
+                                    MaterialSymbol {
+                                        text: "close"
+                                        iconSize: 12
+                                        color: Appearance.colors.colOnSecondaryContainer
+                                        opacity: chipMouse.containsMouse ? 1 : 0.5
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: chipMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const newSubs = subredditEditor.subreddits.filter((_, i) => i !== subChip.index)
+                                        Config.setNestedValue("sidebar.reddit.subreddits", newSubs)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        TextField {
+                            id: subInput
+                            Layout.fillWidth: true
+                            placeholderText: Translation.tr("Add subreddit...")
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            color: Appearance.m3colors.m3onSurface
+                            placeholderTextColor: Appearance.colors.colSubtext
+                            background: Rectangle {
+                                color: Appearance.colors.colLayer1
+                                radius: Appearance.rounding.small
+                                border.width: subInput.activeFocus ? 2 : 1
+                                border.color: subInput.activeFocus ? Appearance.colors.colPrimary : Appearance.colors.colLayer0Border
+                            }
+                            onAccepted: {
+                                const sub = text.trim().replace(/^r\//, "")
+                                if (sub && !subredditEditor.subreddits.includes(sub)) {
+                                    Config.setNestedValue("sidebar.reddit.subreddits", [...subredditEditor.subreddits, sub])
+                                    text = ""
+                                }
+                            }
+                        }
+
+                        RippleButton {
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            buttonRadius: Appearance.rounding.small
+                            colBackgroundHover: Appearance.colors.colPrimaryContainer
+                            onClicked: subInput.accepted()
+
+                            contentItem: MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "add"
+                                iconSize: 18
+                                color: Appearance.colors.colPrimary
+                            }
+                        }
+                    }
+                }
+            }
+
+            ContentSubsection {
+                title: Translation.tr("Anime Schedule")
+                visible: Config.options.sidebar?.animeSchedule?.enable ?? false
+
+                SettingsSwitch {
+                    buttonIcon: "visibility_off"
+                    text: Translation.tr("Show NSFW")
+                    checked: Config.options.sidebar?.animeSchedule?.showNsfw ?? false
+                    onCheckedChanged: Config.setNestedValue("sidebar.animeSchedule.showNsfw", checked)
+                    StyledToolTip {
+                        text: Translation.tr("Include adult-rated anime in results")
+                    }
+                }
             }
 
             ContentSubsection {
@@ -1033,6 +1197,9 @@ ContentPage {
                 }
 
                 ConfigRow {
+                    Layout.fillWidth: true
+                    spacing: 6
+
                     MaterialSymbol {
                         text: "key"
                         iconSize: Appearance.font.pixelSize.larger
@@ -1043,11 +1210,21 @@ ContentPage {
                         font.pixelSize: Appearance.font.pixelSize.small
                         color: Appearance.colors.colOnSecondaryContainer
                     }
-                    MaterialTextField {
-                        Layout.preferredWidth: 180
-                        placeholderText: "••••••"
-                        text: Config.options.sidebar?.wallhaven?.apiKey ?? ""
+                    TextField {
+                        id: wallhavenApiInput
+                        Layout.fillWidth: true
+                        placeholderText: Translation.tr("Optional - for NSFW content")
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        color: Appearance.m3colors.m3onSurface
+                        placeholderTextColor: Appearance.colors.colSubtext
                         echoMode: TextInput.Password
+                        text: Config.options.sidebar?.wallhaven?.apiKey ?? ""
+                        background: Rectangle {
+                            color: Appearance.colors.colLayer1
+                            radius: Appearance.rounding.small
+                            border.width: wallhavenApiInput.activeFocus ? 2 : 1
+                            border.color: wallhavenApiInput.activeFocus ? Appearance.colors.colPrimary : Appearance.colors.colLayer0Border
+                        }
                         onTextChanged: Config.setNestedValue("sidebar.wallhaven.apiKey", text)
                     }
                 }
@@ -1548,7 +1725,7 @@ ContentPage {
                 NoticeBox {
                     Layout.fillWidth: true
                     materialIcon: "drag_indicator"
-                    text: Translation.tr("Ctrl+Click on any widget to reorder")
+                    text: Translation.tr("Hold click on any widget to reorder")
                 }
             }
 

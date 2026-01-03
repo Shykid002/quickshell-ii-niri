@@ -11,6 +11,8 @@ Singleton {
     property bool ready: false
     property int readWriteDelay: 50 // milliseconds
     property bool blockWrites: false
+    
+    signal configChanged()
 
     function flushWrites(): void {
         fileWriteTimer.stop();
@@ -58,6 +60,7 @@ Singleton {
         }
 
         obj[keys[keys.length - 1]] = convertedValue;
+        root.configChanged()
     }
 
     Timer {
@@ -785,6 +788,19 @@ Singleton {
                     property int limit: 24
                     // Optional API key for NSFW & user-specific filters
                     property string apiKey: ""
+                }
+                // Anime Schedule tab - Jikan API (MyAnimeList)
+                property JsonObject animeSchedule: JsonObject {
+                    // Enable/disable the Anime Schedule tab
+                    property bool enable: false
+                    // Filter out NSFW content
+                    property bool showNsfw: false
+                }
+                // Reddit tab - public JSON API
+                property JsonObject reddit: JsonObject {
+                    property bool enable: false
+                    property list<string> subreddits: ["unixporn", "linux", "archlinux", "kde", "gnome"]
+                    property int limit: 25
                 }
                 // Widgets tab in left sidebar
                 property JsonObject widgets: JsonObject {

@@ -4,6 +4,8 @@ import qs.modules.common
 import qs.modules.common.models
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.modules.sidebarLeft.animeSchedule
+import qs.modules.sidebarLeft.reddit
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -40,13 +42,18 @@ Item {
     property bool translatorEnabled: (Config.options?.sidebar?.translator?.enable ?? false)
     property bool animeEnabled: (Config.options?.policies?.weeb ?? 0) !== 0
     property bool animeCloset: (Config.options?.policies?.weeb ?? 0) === 2
+    property bool animeScheduleEnabled: Config.options?.sidebar?.animeSchedule?.enable ?? false
+    property bool redditEnabled: Config.options?.sidebar?.reddit?.enable ?? false
     property bool wallhavenEnabled: Config.options.sidebar?.wallhaven?.enable !== false
     property bool widgetsEnabled: Config.options?.sidebar?.widgets?.enable ?? true
+    
     property var tabButtonList: [
         ...(root.widgetsEnabled ? [{"icon": "widgets", "name": Translation.tr("Widgets")}] : []),
         ...(root.aiChatEnabled ? [{"icon": "neurology", "name": Translation.tr("Intelligence")}] : []),
         ...(root.translatorEnabled ? [{"icon": "translate", "name": Translation.tr("Translator")}] : []),
         ...((root.animeEnabled && !root.animeCloset) ? [{"icon": "bookmark_heart", "name": Translation.tr("Anime")}] : []),
+        ...(root.animeScheduleEnabled ? [{"icon": "calendar_month", "name": Translation.tr("Schedule")}] : []),
+        ...(root.redditEnabled ? [{"icon": "forum", "name": Translation.tr("Reddit")}] : []),
         ...(root.wallhavenEnabled ? [{"icon": "image", "name": Translation.tr("Wallhaven")}] : [])
     ]
 
@@ -190,6 +197,8 @@ Item {
                                     case "neurology": return aiChatComp
                                     case "translate": return translatorComp
                                     case "bookmark_heart": return animeComp
+                                    case "calendar_month": return animeScheduleComp
+                                    case "forum": return redditComp
                                     case "image": return wallhavenComp
                                     default: return null
                                 }
@@ -204,6 +213,8 @@ Item {
         Component { id: aiChatComp; AiChat {} }
         Component { id: translatorComp; Translator {} }
         Component { id: animeComp; Anime {} }
+        Component { id: animeScheduleComp; AnimeScheduleView {} }
+        Component { id: redditComp; RedditView {} }
         Component { id: wallhavenComp; WallhavenView {} }
 
         Keys.onPressed: (event) => {
